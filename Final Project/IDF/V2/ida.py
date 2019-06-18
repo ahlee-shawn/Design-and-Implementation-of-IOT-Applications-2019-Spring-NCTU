@@ -1,12 +1,12 @@
+import random
+import time
+from dan import NoData
 import RPi.GPIO as GPIO
 import sys 
 import time
 import smbus
 import socket
 import threading
-
-import time, random, requests
-import DAN
 
 Gear = 15
 Calibrate = 38
@@ -32,12 +32,41 @@ current_x = 0.0
 current_y = 0.0
 current_z = 0.0
 
-ServerURL = 'http://140.113.199.186:9999' #with no secure connection
-Reg_addr = '1158' #if None, Reg_addr = MAC address
-DAN.profile['dm_name']='fly_simulator_input'
-DAN.profile['df_list']=['add_speed','calibrate','current_flap','gear','minus_speed','sign_x','sign_y','sign_z','terminate','x','y','z']
-#DAN.profile['d_name']= None # None for autoNaming
-DAN.device_registration_with_retry(ServerURL, Reg_addr)
+i2c_bus=smbus.SMBus(1)
+i2c_address=0x69
+i2c_bus.write_byte_data(i2c_address,0x20,0x0F)
+i2c_bus.write_byte_data(i2c_address,0x23,0x20)
+
+### The register server host, you can use IP or Domain.
+host = 'iottalk2.tw'
+### [OPTIONAL] The register port, default = 9992
+# port = 9992
+
+### [OPTIONAL] If not given or None, server will auto-generate.
+# device_name = 'Dummy_Test'
+
+### [OPTIONAL] If not given or None, DAN will register using a random UUID.
+### Or you can use following code to use MAC address for device_addr.
+# from uuid import getnode
+# device_addr = "{:012X}".format(getnode())
+#device_addr = "aa8e5b58-8a9b-419b-b8d5-72624d61108d"
+
+### [OPTIONAL] If not given or None, this device will be used by anyone.
+#username = 'None'
+
+### The Device Model in IoTtalk, please check IoTtalk document.
+device_model = 'fly_simulator_input'
+
+### The input/output device features, please check IoTtalk document.
+idf_list = ['fly_simulator_input']
+#odf_list = ['']
+
+### Set the push interval, default = 1 (sec)
+### Or you can set to 0, and control in your feature input function.
+push_interval = 0.1  # global interval
+interval = {
+	'Dummy_Sensor': 0.1,  # assign feature interval
+}
 
 def GEAR(channel):
 	global gear
@@ -123,80 +152,51 @@ def get_gyro():
 	Z = getSignedNumber(Z) * 70 / 1000
 	return X, Y, Z
 
-def run():
+def register_callback():
+	print('register successfully')
+
+def fly_simulator_input():
 	global current_x, current_y, current_z, x, y, z
-	while True:
-		start = time.time()
-		x, y, z = get_gyro()
-		x -= benchmark_x
-		y -= benchmark_y
-		z -= benchmark_z
-		calibrate = int(GPIO.input(Calibrate) == GPIO.LOW)
-		add_speed = int(GPIO.input(Speed_Up) == GPIO.LOW)
-		minus_speed = int(GPIO.input(Speed_Down) == GPIO.LOW)
-		if x <= 3 and x >= -3:
-			x = 0
-		if y <= 3 and y >= -3:
-			y = 0
-		if z <= 3 and z >= -3:
-			z = 0
-		current_x += (x * 0.1)
-		current_y += (y * 0.1)
-		current_z += (z * 0.1)
-		sign_x = int(current_x > 0)
-		sign_y = int(current_y > 0)
-		sign_z = int(current_z > 0)
-		if current_x < 0:
-			x = -1 * current_x
-		else:
-			x = current_x
-		if current_y < 0:
-			y = -1 * current_y
-		else:
-			y = current_y
-		if current_z < 0:
-			z = -1 * current_z
-		else:
-			z = current_z
-		# msg = format(int(gear), '01b') + format(int(calibrate), '01b') + format(int(terminate), '01b') + format(int(add_speed), '01b') + format(int(minus_speed), '01b') + format(int(current_flap), '03b') + format(int(sign_x), '01b') + format(int(x), '013b') + format(int(sign_y), '01b') + format(int(y), '013b') + format(int(sign_z), '01b') + format(int(z), '013b')
+	start = time.time()
+	x, y, z = get_gyro()
+	x -= benchmark_x
+	y -= benchmark_y
+	z -= benchmark_z
+	calibrate = int(GPIO.input(Calibrate) == GPIO.LOW)
+	add_speed = int(GPIO.input(Speed_Up) == GPIO.LOW)
+	minus_speed = int(GPIO.input(Speed_Down) == GPIO.LOW)
+	if x <= 3 and x >= -3:
+		x = 0
+	if y <= 3 and y >= -3:
+		y = 0
+	if z <= 3 and z >= -3:
+		z = 0
+	current_x += (x * 0.1)
+	current_y += (y * 0.1)
+	current_z += (z * 0.1)
+	sign_x = int(current_x > 0)
+	sign_y = int(current_y > 0)
+	sign_z = int(current_z > 0)
+	if current_x < 0:
+		x = -1 * current_x
+	else:
+		x = current_x
+	if current_y < 0:
+		y = -1 * current_y
+	else:
+		y = current_y
+	if current_z < 0:
+		z = -1 * current_z
+	else:
+		z = current_z
+	# msg = format(int(gear), '01b') + format(int(calibrate), '01b') + format(int(terminate), '01b') + format(int(add_speed), '01b') + format(int(minus_speed), '01b') + format(int(current_flap), '03b') + format(int(sign_x), '01b') + format(int(x), '013b') + format(int(sign_y), '01b') + format(int(y), '013b') + format(int(sign_z), '01b') + format(int(z), '013b')
 
-		try:
-			DAN.push ('add_speed', add_speed)
-			DAN.push ('calibrate', calibrate)
-			DAN.push ('current_flap', current_flap)
-			DAN.push ('gear', gear)
-			DAN.push ('minus_speed', minus_speed)
-			DAN.push ('sign_x', sign_x)
-			DAN.push ('sign_y', sign_y)
-			DAN.push ('sign_z', sign_z)
-			DAN.push ('terminate', terminate)
-			DAN.push ('x', x)
-			DAN.push ('y', y)
-			DAN.push ('z', z)
-
-		except Exception as e:
-			print(e)
-			if str(e).find('mac_addr not found:') != -1:
-				print('Reg_addr is not found. Try to re-register...')
-				DAN.device_registration_with_retry(ServerURL, Reg_addr)
-			else:
-				print('Connection failed due to unknow reasons.')
-
-		if terminate == 1:
-			GPIO.cleanup()
-			sys.exit(1)
-		time_past = time.time() - start
-		time_to_sleep = 0.1 - time_past
-		if time_to_sleep > 0:
-			time.sleep(time_to_sleep)
-
-if __name__ == "__main__":
-	i2c_bus=smbus.SMBus(1)
-	i2c_address=0x69
-	i2c_bus.write_byte_data(i2c_address,0x20,0x0F)
-	i2c_bus.write_byte_data(i2c_address,0x23,0x20)
-	run()
-	# if len(sys.argv) == 3:
-	# 	launch_client(sys.argv[1], sys.argv[2]) #IP, Port
-	# else:
-	# 	print('Usage: python3 {} IP PORT'.format(sys.argv[0]))
+	if terminate == 1:
+		GPIO.cleanup()
+		sys.exit(1)
+	time_past = time.time() - start
+	time_to_sleep = 0.1 - time_past
+	if time_to_sleep > 0:
+		time.sleep(time_to_sleep)
+	return [gear, calibrate, terminate, add_speed, minus_speed, current_flap, sign_x, x, sign_y, y, sign_z, z]
+	# return NoData

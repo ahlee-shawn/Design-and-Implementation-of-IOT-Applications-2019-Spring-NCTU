@@ -4,7 +4,7 @@ import pyautogui
 
 ServerURL = 'http://140.113.199.186:9999'      #with non-secure connection
 #ServerURL = 'https://DomainName' #with SSL connection
-Reg_addr = '5555' #  if None, Reg_addr = MAC address
+Reg_addr = 'dsgas' #  if None, Reg_addr = MAC address
 
 DAN.profile['dm_name']='fly_simulator_output'
 DAN.profile['df_list']=['Gear', 'Calibrate', 'Terminate', 'Add_speed', 'Minus_speed', 'Current_flap', 'Sign_x',
@@ -19,7 +19,7 @@ height = screen_size.height
 width = screen_size.width
 screen_y = height / 2
 screen_x = width / 2
-gear = 1
+gear = 1.0
 current_flap = 0
 sign_x = 0
 sign_y = 0
